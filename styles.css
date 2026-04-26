@@ -39,6 +39,11 @@ body {
   margin-bottom: 14px;
 }
 
+.fullscreen-button {
+  flex: 0 0 auto;
+  min-height: 58px;
+}
+
 .eyebrow {
   margin: 0 0 5px;
   color: var(--blue);
@@ -95,6 +100,27 @@ canvas {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
+}
+
+.game-frame:fullscreen,
+.game-frame:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.game-frame:fullscreen canvas,
+.game-frame:-webkit-full-screen canvas {
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+}
+
+.game-frame:fullscreen .menu,
+.game-frame:-webkit-full-screen .menu {
+  padding: min(4vw, 32px);
 }
 
 .menu {

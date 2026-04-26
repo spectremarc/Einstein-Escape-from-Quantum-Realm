@@ -1,5 +1,7 @@
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d");
+const gameFrame = document.querySelector("#game-frame");
+const fullscreenToggle = document.querySelector("#fullscreen-toggle");
 const menu = document.querySelector("#menu");
 const panels = [...document.querySelectorAll(".panel")];
 const modeStatus = document.querySelector("#mode-status");
@@ -274,6 +276,22 @@ function send(message) {
   if (conn && conn.open) conn.send(message);
 }
 
+function toggleFullscreen() {
+  const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+  if (fullscreenElement) {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    return;
+  }
+  if (gameFrame.requestFullscreen) gameFrame.requestFullscreen();
+  else if (gameFrame.webkitRequestFullscreen) gameFrame.webkitRequestFullscreen();
+}
+
+function updateFullscreenButton() {
+  const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+  fullscreenToggle.textContent = fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+}
+
 function loop(timestamp = 0) {
   cancelAnimationFrame(rafId);
   if (!game.running) return;
@@ -412,9 +430,9 @@ function updatePlayer(player, input) {
   const move = input.move || 0;
   if (move < -0.1) player.facing = -1;
   if (move > 0.1) player.facing = 1;
-  player.vx += move * 0.56;
+  player.vx += move * 0.49;
   player.vx *= 0.84;
-  player.vx = clamp(player.vx, -5.4, 5.4);
+  player.vx = clamp(player.vx, -4.8, 4.8);
 
   if (input.jump && player.jumps > 0) {
     player.vy = player.grounded ? -10.8 : -11.4;
@@ -879,6 +897,7 @@ function drawCompletionBanner() {
 document.querySelector("#show-single").addEventListener("click", () => showPanel("single-panel"));
 document.querySelector("#show-multi").addEventListener("click", () => showPanel("multi-panel"));
 document.querySelector("#start-single").addEventListener("click", startSingle);
+fullscreenToggle.addEventListener("click", toggleFullscreen);
 document.querySelector("#local-coop").addEventListener("click", startLocalCoop);
 document.querySelector("#online-menu").addEventListener("click", showOnlineActions);
 document.querySelector("#host-game").addEventListener("click", hostGame);
@@ -918,9 +937,12 @@ window.addEventListener("keydown", (event) => {
     else detectAssignment({ type: "keyboard" });
   }
   if (event.key.toLowerCase() === "t") runFinishTest();
+  if (event.key.toLowerCase() === "f") toggleFullscreen();
   if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) event.preventDefault();
 });
 window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 
 setInterval(() => {
   if (!assignment) return;
