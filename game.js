@@ -25,6 +25,7 @@ let conn = null;
 let role = "single";
 let rafId = 0;
 let assignment = null;
+let lastSnapshot = null;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -256,8 +257,7 @@ function bindConnection() {
       applyRemoteInput(message.input);
     }
     if (message.type === "state" && role === "join") {
-      game = message.game;
-      draw();
+      applySnapshot(message.snapshot);
     }
     if (message.type === "restart") {
       game = createGame();
@@ -286,6 +286,7 @@ function update(now) {
   const pads = getGamepads();
   const blueInput = readAssignedInput("blue", pads);
   const redInput = readAssignedInput("red", pads);
+  const localOnlineInput = readInput(0, true, pads);
   if (blueInput.restart || redInput.restart) {
     game = createGame();
     game.running = true;
@@ -299,7 +300,10 @@ function update(now) {
   }
 
   if (role === "join") {
-    send({ type: "input", input: blueInput });
+    send({ type: "input", input: localOnlineInput });
+    if (lastSnapshot) applySnapshot(lastSnapshot);
+    updateCamera();
+    draw();
     previousFrame(pads);
     return;
   }
@@ -307,8 +311,47 @@ function update(now) {
   updatePlayer(game.players.blue, blueInput);
   if (role === "local") updatePlayer(game.players.red, redInput);
   updateWorld();
-  if (role === "host") send({ type: "state", game });
+  if (role === "host") send({ type: "state", snapshot: makeSnapshot() });
   previousFrame(pads);
+}
+
+function makeSnapshot() {
+  return {
+    running: game.running,
+    completed: game.completed,
+    time: game.time,
+    camera: game.camera,
+    zoom: game.zoom,
+    objective: game.objective,
+    endProgress: game.endProgress,
+    players: game.players,
+    walls: level.walls.map((wall) => wall.open),
+    plates: level.plates.map((plate) => plate.active),
+    cores: level.cores.map((core) => core.taken),
+    doorOpen: level.door.open,
+    crushers: level.crushers.map((crusher) => crusher.y),
+    molecules: level.molecules.map((molecule) => molecule.phase),
+  };
+}
+
+function applySnapshot(snapshot) {
+  if (!snapshot) return;
+  lastSnapshot = snapshot;
+  game.running = snapshot.running;
+  game.completed = snapshot.completed;
+  game.time = snapshot.time;
+  game.camera = snapshot.camera;
+  game.zoom = snapshot.zoom;
+  game.objective = snapshot.objective;
+  game.endProgress = snapshot.endProgress;
+  game.players = snapshot.players;
+  snapshot.walls.forEach((open, index) => { level.walls[index].open = open; });
+  snapshot.plates.forEach((active, index) => { level.plates[index].active = active; });
+  snapshot.cores.forEach((taken, index) => { level.cores[index].taken = taken; });
+  level.door.open = snapshot.doorOpen;
+  snapshot.crushers.forEach((y, index) => { level.crushers[index].y = y; });
+  snapshot.molecules.forEach((phase, index) => { level.molecules[index].phase = phase; });
+  objectiveStatus.textContent = game.objective;
 }
 
 function applyRemoteInput(input) {
