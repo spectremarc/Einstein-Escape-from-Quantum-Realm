@@ -27,6 +27,8 @@ let rafId = 0;
 let assignment = null;
 let lastSnapshot = null;
 let lastNetworkSend = 0;
+let lastInputSend = 0;
+let lastInputPacket = "";
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -301,9 +303,7 @@ function update(now) {
   }
 
   if (role === "join") {
-    send({ type: "input", input: localOnlineInput });
-    if (lastSnapshot) applySnapshot(lastSnapshot);
-    updateCamera();
+    sendInputIfNeeded(localOnlineInput, now);
     draw();
     previousFrame(pads);
     return;
@@ -312,11 +312,22 @@ function update(now) {
   updatePlayer(game.players.blue, blueInput);
   if (role === "local") updatePlayer(game.players.red, redInput);
   updateWorld();
-  if (role === "host" && now - lastNetworkSend > 1 / 20) {
+  if (role === "host" && now - lastNetworkSend > 1 / 15) {
     send({ type: "state", snapshot: makeSnapshot() });
     lastNetworkSend = now;
   }
   previousFrame(pads);
+}
+
+function sendInputIfNeeded(input, now) {
+  const packet = `${Math.round(input.move * 100)},${input.jump ? 1 : 0},${input.activate ? 1 : 0},${input.restart ? 1 : 0}`;
+  const changed = packet !== lastInputPacket;
+  if (!changed && now - lastInputSend < 1 / 12) return;
+  if (changed || now - lastInputSend > 1 / 30) {
+    send({ type: "input", input });
+    lastInputPacket = packet;
+    lastInputSend = now;
+  }
 }
 
 function makeSnapshot() {
@@ -362,6 +373,18 @@ function unpackPlayer(color, data) {
   };
 }
 
+function applyPackedPlayer(player, data) {
+  player.x = data[0];
+  player.y = data[1];
+  player.vx = data[2];
+  player.vy = data[3];
+  player.facing = data[4];
+  player.grounded = Boolean(data[5]);
+  player.jumps = data[6];
+  player.activateFlash = data[7];
+  player.hurt = data[8];
+}
+
 function applySnapshot(snapshot) {
   if (!snapshot) return;
   lastSnapshot = snapshot;
@@ -372,10 +395,8 @@ function applySnapshot(snapshot) {
   game.zoom = snapshot.zoom;
   game.objective = snapshot.o;
   game.endProgress = snapshot.e;
-  game.players = {
-    blue: unpackPlayer("blue", snapshot.p.blue),
-    red: unpackPlayer("red", snapshot.p.red),
-  };
+  applyPackedPlayer(game.players.blue, snapshot.p.blue);
+  applyPackedPlayer(game.players.red, snapshot.p.red);
   snapshot.w.forEach((open, index) => { level.walls[index].open = Boolean(open); });
   snapshot.pl.forEach((active, index) => { level.plates[index].active = Boolean(active); });
   snapshot.co.forEach((taken, index) => { level.cores[index].taken = Boolean(taken); });
