@@ -16,6 +16,7 @@ const assignP1 = document.querySelector("#assign-p1");
 const assignP2 = document.querySelector("#assign-p2");
 const assignBlue = document.querySelector("#assign-blue");
 const assignRed = document.querySelector("#assign-red");
+const levelSelect = document.querySelector("#level-select");
 
 const W = canvas.width;
 const H = canvas.height;
@@ -35,53 +36,241 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 const pressed = (key) => keys.has(key) && !previousKeys.has(key);
 
-const level = {
-  width: 3200,
-  deathY: 820,
-  platforms: [
-    { x: 0, y: 650, w: 780, h: 70 },
-    { x: 840, y: 560, w: 320, h: 34 },
-    { x: 1230, y: 480, w: 320, h: 34 },
-    { x: 1620, y: 650, w: 540, h: 70 },
-    { x: 2250, y: 560, w: 360, h: 34 },
-    { x: 2660, y: 650, w: 540, h: 70 },
-  ],
-  walls: [
-    { x: 720, y: 300, w: 52, h: 350, gate: "blue", open: false },
-    { x: 1540, y: 250, w: 58, h: 400, gate: "red", open: false },
-    { x: 2600, y: 250, w: 58, h: 400, gate: "final", open: false },
-  ],
-  plates: [
-    { x: 580, y: 625, w: 80, h: 18, color: "blue", active: false },
-    { x: 1370, y: 455, w: 80, h: 18, color: "red", active: false },
-    { x: 2325, y: 535, w: 80, h: 18, color: "blue", active: false },
-    { x: 2485, y: 535, w: 80, h: 18, color: "red", active: false },
-  ],
-  cores: [
-    { x: 1040, y: 510, w: 28, h: 28, color: "blue", taken: false },
-    { x: 1840, y: 602, w: 28, h: 28, color: "red", taken: false },
-  ],
-  hazards: [
-    { x: 1180, y: 632, w: 250, h: 18 },
-    { x: 2170, y: 632, w: 260, h: 18 },
-  ],
-  molecules: [
-    { x: 1900, y: 602, r: 42, phase: 1.6 },
-    { x: 2410, y: 518, r: 32, phase: 3.1 },
-  ],
-  crushers: [
-    { x: 940, baseY: 500, y: 500, w: 62, h: 60, phase: 0, range: 0 },
-  ],
-  door: { x: 3000, y: 505, w: 72, h: 145, open: false },
-};
+const LEVELS = [
+  {
+    name: "Level 1: Compression Gate",
+    width: 3200,
+    deathY: 820,
+    start: { blue: [110, 560], red: [180, 560] },
+    platforms: [
+      { x: 0, y: 650, w: 780, h: 70 },
+      { x: 840, y: 560, w: 320, h: 34 },
+      { x: 1230, y: 480, w: 320, h: 34 },
+      { x: 1620, y: 650, w: 540, h: 70 },
+      { x: 2250, y: 560, w: 360, h: 34 },
+      { x: 2660, y: 650, w: 540, h: 70 },
+    ],
+    walls: [
+      { x: 720, y: 300, w: 52, h: 350, gate: "blue", open: false },
+      { x: 1540, y: 250, w: 58, h: 400, gate: "red", open: false },
+      { x: 2600, y: 250, w: 58, h: 400, gate: "final", open: false },
+    ],
+    plates: [
+      { x: 580, y: 625, w: 80, h: 18, color: "blue", active: false },
+      { x: 1370, y: 455, w: 80, h: 18, color: "red", active: false },
+      { x: 2325, y: 535, w: 80, h: 18, color: "blue", active: false },
+      { x: 2485, y: 535, w: 80, h: 18, color: "red", active: false },
+    ],
+    cores: [
+      { x: 1040, y: 510, w: 28, h: 28, color: "blue", taken: false },
+      { x: 1840, y: 602, w: 28, h: 28, color: "red", taken: false },
+    ],
+    hazards: [
+      { x: 1180, y: 632, w: 250, h: 18 },
+      { x: 2170, y: 632, w: 260, h: 18 },
+    ],
+    molecules: [
+      { x: 1900, y: 602, r: 42, phase: 1.6 },
+      { x: 2410, y: 518, r: 32, phase: 3.1 },
+    ],
+    movers: [
+      { x: 940, baseX: 940, baseY: 500, y: 500, w: 62, h: 60, phase: 0, rangeX: 0, rangeY: 0, speed: 1 },
+    ],
+    door: { x: 3000, y: 505, w: 72, h: 145, open: false },
+  },
+  {
+    name: "Level 2: Photon Ferry",
+    width: 3600,
+    deathY: 840,
+    start: { blue: [100, 560], red: [170, 560] },
+    platforms: [
+      { x: 0, y: 650, w: 620, h: 70 },
+      { x: 625, y: 612, w: 150, h: 30 },
+      { x: 760, y: 580, w: 260, h: 34 },
+      { x: 1080, y: 632, w: 90, h: 24 },
+      { x: 1180, y: 500, w: 300, h: 34 },
+      { x: 1660, y: 620, w: 420, h: 60 },
+      { x: 2100, y: 632, w: 140, h: 24 },
+      { x: 2260, y: 520, w: 320, h: 34 },
+      { x: 2780, y: 650, w: 650, h: 70 },
+    ],
+    walls: [
+      { x: 640, y: 265, w: 54, h: 385, gate: "blue", open: false },
+      { x: 1530, y: 245, w: 58, h: 405, gate: "red", open: false },
+      { x: 2660, y: 245, w: 58, h: 405, gate: "final", open: false },
+    ],
+    plates: [
+      { x: 500, y: 625, w: 80, h: 18, color: "blue", active: false },
+      { x: 1300, y: 475, w: 80, h: 18, color: "red", active: false },
+      { x: 2300, y: 495, w: 80, h: 18, color: "blue", active: false },
+      { x: 2460, y: 495, w: 80, h: 18, color: "red", active: false },
+    ],
+    cores: [
+      { x: 905, y: 532, w: 28, h: 28, color: "blue", taken: false },
+      { x: 1840, y: 572, w: 28, h: 28, color: "red", taken: false },
+    ],
+    hazards: [
+      { x: 1040, y: 632, w: 130, h: 18 },
+    ],
+    molecules: [
+      { x: 1980, y: 570, r: 36, phase: 1 },
+    ],
+    movers: [
+      { x: 2140, baseX: 2140, baseY: 390, y: 390, w: 70, h: 70, phase: 2, rangeX: 0, rangeY: 135, speed: 1 },
+    ],
+    door: { x: 3330, y: 505, w: 72, h: 145, open: false },
+  },
+  {
+    name: "Level 3: Electron Lift",
+    width: 3900,
+    deathY: 850,
+    start: { blue: [100, 560], red: [170, 560] },
+    platforms: [
+      { x: 0, y: 650, w: 540, h: 70 },
+      { x: 680, y: 540, w: 260, h: 34 },
+      { x: 1120, y: 430, w: 260, h: 34 },
+      { x: 1540, y: 610, w: 460, h: 60 },
+      { x: 2140, y: 520, w: 300, h: 34 },
+      { x: 2680, y: 440, w: 300, h: 34 },
+      { x: 3180, y: 650, w: 580, h: 70 },
+    ],
+    walls: [
+      { x: 560, y: 245, w: 54, h: 405, gate: "blue", open: false },
+      { x: 1450, y: 220, w: 58, h: 430, gate: "red", open: false },
+      { x: 3060, y: 230, w: 58, h: 420, gate: "final", open: false },
+    ],
+    plates: [
+      { x: 410, y: 625, w: 80, h: 18, color: "blue", active: false },
+      { x: 1230, y: 405, w: 80, h: 18, color: "red", active: false },
+      { x: 2220, y: 495, w: 80, h: 18, color: "blue", active: false },
+      { x: 2790, y: 415, w: 80, h: 18, color: "red", active: false },
+    ],
+    cores: [
+      { x: 780, y: 492, w: 28, h: 28, color: "blue", taken: false },
+      { x: 2300, y: 472, w: 28, h: 28, color: "red", taken: false },
+    ],
+    hazards: [
+      { x: 980, y: 632, w: 170, h: 18 },
+      { x: 2460, y: 632, w: 190, h: 18 },
+    ],
+    molecules: [
+      { x: 1660, y: 560, r: 34, phase: 0.4 },
+    ],
+    movers: [
+      { x: 1000, baseX: 1000, baseY: 440, y: 440, w: 70, h: 72, phase: 0, rangeX: 0, rangeY: 165, speed: 0.95 },
+      { x: 2500, baseX: 2500, baseY: 500, y: 500, w: 82, h: 56, phase: 1.5, rangeX: 210, rangeY: 0, speed: 1.05 },
+    ],
+    door: { x: 3650, y: 505, w: 72, h: 145, open: false },
+  },
+  {
+    name: "Level 4: Molecular Bridge",
+    width: 4200,
+    deathY: 860,
+    start: { blue: [100, 560], red: [170, 560] },
+    platforms: [
+      { x: 0, y: 650, w: 560, h: 70 },
+      { x: 720, y: 585, w: 240, h: 34 },
+      { x: 1120, y: 510, w: 250, h: 34 },
+      { x: 1540, y: 650, w: 480, h: 70 },
+      { x: 2180, y: 565, w: 280, h: 34 },
+      { x: 2660, y: 485, w: 280, h: 34 },
+      { x: 3200, y: 590, w: 300, h: 34 },
+      { x: 3660, y: 650, w: 420, h: 70 },
+    ],
+    walls: [
+      { x: 590, y: 235, w: 54, h: 415, gate: "blue", open: false },
+      { x: 1445, y: 245, w: 58, h: 405, gate: "red", open: false },
+      { x: 3540, y: 240, w: 58, h: 410, gate: "final", open: false },
+    ],
+    plates: [
+      { x: 420, y: 625, w: 80, h: 18, color: "blue", active: false },
+      { x: 1225, y: 485, w: 80, h: 18, color: "red", active: false },
+      { x: 2275, y: 540, w: 80, h: 18, color: "blue", active: false },
+      { x: 3300, y: 565, w: 80, h: 18, color: "red", active: false },
+    ],
+    cores: [
+      { x: 825, y: 537, w: 28, h: 28, color: "blue", taken: false },
+      { x: 2740, y: 437, w: 28, h: 28, color: "red", taken: false },
+    ],
+    hazards: [
+      { x: 980, y: 632, w: 120, h: 18 },
+      { x: 2960, y: 632, w: 200, h: 18 },
+    ],
+    molecules: [
+      { x: 1800, y: 600, r: 44, phase: 0 },
+    ],
+    movers: [
+      { x: 1020, baseX: 1020, baseY: 548, y: 548, w: 76, h: 58, phase: 0, rangeX: 170, rangeY: 0, speed: 1 },
+      { x: 3030, baseX: 3030, baseY: 410, y: 410, w: 72, h: 86, phase: 1, rangeX: 0, rangeY: 145, speed: 0.9 },
+    ],
+    door: { x: 3940, y: 505, w: 72, h: 145, open: false },
+  },
+  {
+    name: "Level 5: Quantum Core",
+    width: 4500,
+    deathY: 870,
+    start: { blue: [100, 560], red: [170, 560] },
+    platforms: [
+      { x: 0, y: 650, w: 520, h: 70 },
+      { x: 700, y: 610, w: 230, h: 34 },
+      { x: 1080, y: 520, w: 230, h: 34 },
+      { x: 1460, y: 390, w: 250, h: 34 },
+      { x: 1850, y: 610, w: 420, h: 60 },
+      { x: 2470, y: 500, w: 260, h: 34 },
+      { x: 2940, y: 405, w: 280, h: 34 },
+      { x: 3380, y: 545, w: 280, h: 34 },
+      { x: 3820, y: 650, w: 520, h: 70 },
+    ],
+    walls: [
+      { x: 560, y: 190, w: 54, h: 460, gate: "blue", open: false },
+      { x: 1750, y: 185, w: 58, h: 465, gate: "red", open: false },
+      { x: 3660, y: 180, w: 62, h: 470, gate: "final", open: false },
+    ],
+    plates: [
+      { x: 390, y: 625, w: 80, h: 18, color: "blue", active: false },
+      { x: 1560, y: 365, w: 80, h: 18, color: "red", active: false },
+      { x: 2560, y: 475, w: 80, h: 18, color: "blue", active: false },
+      { x: 3460, y: 520, w: 80, h: 18, color: "red", active: false },
+    ],
+    cores: [
+      { x: 795, y: 562, w: 28, h: 28, color: "blue", taken: false },
+      { x: 3030, y: 357, w: 28, h: 28, color: "red", taken: false },
+    ],
+    hazards: [
+      { x: 940, y: 632, w: 120, h: 18 },
+      { x: 2280, y: 632, w: 170, h: 18 },
+      { x: 3240, y: 632, w: 130, h: 18 },
+    ],
+    molecules: [
+      { x: 1995, y: 565, r: 46, phase: 0.5 },
+      { x: 3520, y: 492, r: 38, phase: 2.4 },
+    ],
+    movers: [
+      { x: 990, baseX: 990, baseY: 560, y: 560, w: 64, h: 56, phase: 0, rangeX: 150, rangeY: 0, speed: 0.95 },
+      { x: 2320, baseX: 2320, baseY: 355, y: 355, w: 76, h: 88, phase: 1.2, rangeX: 0, rangeY: 135, speed: 0.85 },
+      { x: 3260, baseX: 3260, baseY: 500, y: 500, w: 74, h: 54, phase: 2.1, rangeX: 135, rangeY: 0, speed: 0.95 },
+    ],
+    door: { x: 4250, y: 505, w: 72, h: 145, open: false },
+  },
+];
+
+let currentLevelIndex = 0;
+let level = cloneLevel(currentLevelIndex);
+
+function cloneLevel(index) {
+  return JSON.parse(JSON.stringify(LEVELS[index]));
+}
 
 let game = createGame();
 
 function createGame() {
+  level = cloneLevel(currentLevelIndex);
   for (const wall of level.walls) wall.open = false;
   for (const plate of level.plates) plate.active = false;
   for (const core of level.cores) core.taken = false;
   level.door.open = false;
+  const blueStart = level.start.blue;
+  const redStart = level.start.red;
   return {
     running: false,
     camera: 0,
@@ -89,9 +278,10 @@ function createGame() {
     time: 0,
     objective: "Choose a mode",
     endProgress: 0,
+    completed: false,
     players: {
-      blue: makePlayer("blue", 110, 560),
-      red: makePlayer("red", 180, 560),
+      blue: makePlayer("blue", blueStart[0], blueStart[1]),
+      red: makePlayer("red", redStart[0], redStart[1]),
     },
   };
 }
@@ -110,12 +300,14 @@ function showPanel(id) {
 }
 
 function startSingle() {
+  currentLevelIndex = 0;
   role = "single";
   roomStatus.textContent = "LOCAL";
   startLevel("Single");
 }
 
 function startLocalCoop() {
+  currentLevelIndex = 0;
   assignment = { blue: null, red: null, pending: null, selected: "blue" };
   roomStatus.textContent = "LOCAL";
   networkMessage.textContent = "Claim an input device, then choose Blue or Red.";
@@ -126,11 +318,34 @@ function startLocalCoop() {
 }
 
 function startLevel(mode) {
+  lastPlayerPacket = "";
+  lastPlayerSend = 0;
   game = createGame();
   game.running = true;
   modeStatus.textContent = mode;
+  levelSelect.value = String(currentLevelIndex);
+  objectiveStatus.textContent = level.name;
   menu.classList.add("hidden");
   loop();
+}
+
+function goToLevel(index) {
+  currentLevelIndex = clamp(index, 0, LEVELS.length - 1);
+  send({ type: "level", index: currentLevelIndex });
+  startLevel(modeStatus.textContent === "Intro" ? "Single" : modeStatus.textContent);
+}
+
+function nextLevel() {
+  if (!game.completed) return;
+  if (currentLevelIndex < LEVELS.length - 1) {
+    goToLevel(currentLevelIndex + 1);
+    return;
+  }
+  game.completed = false;
+  menu.classList.remove("hidden");
+  showPanel("intro-panel");
+  document.querySelector("#intro-panel h2").textContent = "Quantum Realm Cleared";
+  document.querySelector("#intro-panel p").textContent = "Einstein escaped all five prototype levels. Restart from the menu to play again.";
 }
 
 function showOnlineActions() {
@@ -217,6 +432,7 @@ function hostGame() {
     return;
   }
   const code = makeRoomCode();
+  currentLevelIndex = 0;
   role = "host";
   roomStatus.textContent = code;
   networkMessage.textContent = `Hosting room ${code}. Share this code with player two.`;
@@ -239,6 +455,7 @@ function joinGame(code) {
     return;
   }
   role = "join";
+  currentLevelIndex = 0;
   roomStatus.textContent = code;
   networkMessage.textContent = `Joining ${code}...`;
   peer = new Peer(undefined, { debug: 1 });
@@ -265,6 +482,10 @@ function bindConnection() {
     if (message.type === "restart") {
       game = createGame();
       game.running = true;
+    }
+    if (message.type === "level") {
+      currentLevelIndex = message.index;
+      startLevel(modeStatus.textContent || "Joined");
     }
   });
   conn.on("close", () => {
@@ -374,10 +595,10 @@ function applyRemotePlayer(color, playerData) {
 
 function updateWorld() {
   for (const molecule of level.molecules) molecule.phase += 0.035;
-  for (const crusher of level.crushers) {
-    crusher.y = crusher.range
-      ? crusher.baseY + (Math.sin(game.time * 1.8 + crusher.phase) + 1) * 0.5 * crusher.range
-      : crusher.baseY;
+  for (const mover of level.movers) {
+    const wave = Math.sin(game.time * mover.speed * 1.8 + mover.phase);
+    mover.x = mover.baseX + wave * mover.rangeX;
+    mover.y = mover.baseY + wave * mover.rangeY;
   }
   for (const player of activePlayers()) {
     player.activateFlash = Math.max(0, player.activateFlash - 1);
@@ -390,8 +611,8 @@ function updateWorld() {
       const m = { x: molecule.x - molecule.r, y: molecule.y - molecule.r, w: molecule.r * 2, h: molecule.r * 2 };
       if (hit(player, m)) resetPlayer(player);
     }
-    for (const crusher of level.crushers) {
-      if (hit(player, crusher)) resetPlayer(player);
+    for (const mover of level.movers) {
+      if (hit(player, mover)) resetPlayer(player);
     }
   }
 
@@ -435,13 +656,13 @@ function updatePlayer(player, input) {
   player.vx = clamp(player.vx, -4.8, 4.8);
 
   if (input.jump && player.jumps > 0) {
-    player.vy = player.grounded ? -10.8 : -11.4;
+    player.vy = player.grounded ? -12.1 : -12.9;
     player.grounded = false;
     player.jumps -= 1;
   }
   if (input.activate) player.activateFlash = 12;
 
-  player.vy += 0.52;
+  player.vy += 0.5;
   moveEntity(player, player.vx, 0);
   player.grounded = false;
   moveEntity(player, 0, player.vy);
@@ -472,8 +693,8 @@ function moveEntity(entity, dx, dy) {
 
 function updatePlates() {
   for (const plate of level.plates) {
-    const player = game.players[plate.color];
-    plate.active = hit(player, plate) && player.activateFlash > 0;
+    const player = role === "single" ? game.players.blue : game.players[plate.color];
+    plate.active = plate.active || (hit(player, plate) && player.activateFlash > 0);
   }
 }
 
@@ -535,8 +756,9 @@ function runFinishTest() {
 }
 
 function resetPlayer(player) {
-  player.x = player.color === "blue" ? 110 : 180;
-  player.y = 560;
+  const start = level.start[player.color];
+  player.x = start[0];
+  player.y = start[1];
   player.vx = 0;
   player.vy = 0;
   player.grounded = false;
@@ -628,6 +850,7 @@ function draw() {
   ctx.translate(-game.camera, 0);
   drawLevel();
   drawPlayers();
+  drawWorldLighting();
   ctx.restore();
   drawHud();
   if (game.completed) drawCompletionBanner();
@@ -643,6 +866,21 @@ function drawBackground() {
 
   ctx.save();
   ctx.translate(-game.camera * 0.08, 0);
+  for (let i = -2; i < 16; i += 1) {
+    const x = i * 310;
+    const tower = ctx.createLinearGradient(x, 140, x + 190, 640);
+    tower.addColorStop(0, "rgba(89,216,255,0.04)");
+    tower.addColorStop(1, "rgba(246,239,226,0.01)");
+    ctx.fillStyle = tower;
+    ctx.beginPath();
+    ctx.moveTo(x + 40, 620);
+    ctx.lineTo(x + 110, 180 + Math.sin(i) * 60);
+    ctx.lineTo(x + 210, 620);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(89,216,255,0.055)";
+    ctx.stroke();
+  }
   for (let i = -2; i < 18; i += 1) {
     const x = i * 220;
     ctx.strokeStyle = "rgba(89,216,255,0.08)";
@@ -657,6 +895,13 @@ function drawBackground() {
   }
   ctx.restore();
 
+  const coreGlow = ctx.createRadialGradient(W * 0.72, H * 0.34, 60, W * 0.72, H * 0.34, 520);
+  coreGlow.addColorStop(0, "rgba(117,240,162,0.13)");
+  coreGlow.addColorStop(0.45, "rgba(89,216,255,0.06)");
+  coreGlow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = coreGlow;
+  ctx.fillRect(0, 0, W, H);
+
   for (let i = 0; i < 90; i += 1) {
     const x = (i * 151 - game.camera * 0.18) % W;
     const y = (i * 89) % H;
@@ -665,6 +910,25 @@ function drawBackground() {
     ctx.arc(x < 0 ? x + W : x, y, (i % 4) + 1, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+function drawWorldLighting() {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const player of activePlayers()) {
+    const color = player.color === "blue" ? "89,216,255" : "255,93,110";
+    const light = ctx.createRadialGradient(player.x + player.w / 2, player.y + 18, 8, player.x + player.w / 2, player.y + 18, 190);
+    light.addColorStop(0, `rgba(${color},0.18)`);
+    light.addColorStop(1, `rgba(${color},0)`);
+    ctx.fillStyle = light;
+    ctx.fillRect(player.x - 190, player.y - 180, 380, 380);
+  }
+  const doorLight = ctx.createRadialGradient(level.door.x + 36, level.door.y + 70, 10, level.door.x + 36, level.door.y + 70, 260);
+  doorLight.addColorStop(0, level.door.open ? "rgba(117,240,162,0.28)" : "rgba(89,216,255,0.12)");
+  doorLight.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = doorLight;
+  ctx.fillRect(level.door.x - 240, level.door.y - 190, 520, 520);
+  ctx.restore();
 }
 
 function drawLevel() {
@@ -684,7 +948,7 @@ function drawLevel() {
   ctx.fillStyle = "rgba(255,93,110,0.4)";
   ctx.fillRect(game.camera - 200, level.deathY - 24, W / game.zoom + 400, 4);
 
-  for (const crusher of level.crushers) drawCrusher(crusher);
+  for (const mover of level.movers) drawMover(mover);
   for (const molecule of level.molecules) drawMolecule(molecule);
   for (const core of level.cores) if (!core.taken) drawCore(core);
   for (const plate of level.plates) drawPlate(plate);
@@ -692,23 +956,23 @@ function drawLevel() {
   drawDoor();
 }
 
-function drawCrusher(crusher) {
+function drawMover(mover) {
   ctx.save();
   ctx.shadowColor = "#ff5d6e";
   ctx.shadowBlur = 18;
-  const body = ctx.createLinearGradient(crusher.x, crusher.y, crusher.x, crusher.y + crusher.h);
+  const body = ctx.createLinearGradient(mover.x, mover.y, mover.x, mover.y + mover.h);
   body.addColorStop(0, "rgba(255,93,110,0.9)");
   body.addColorStop(0.5, "rgba(86,28,44,0.9)");
   body.addColorStop(1, "rgba(255,93,110,0.78)");
   ctx.fillStyle = body;
-  ctx.fillRect(crusher.x, crusher.y, crusher.w, crusher.h);
+  ctx.fillRect(mover.x, mover.y, mover.w, mover.h);
   ctx.shadowBlur = 0;
   ctx.strokeStyle = "#f6efe2";
   ctx.lineWidth = 3;
-  ctx.strokeRect(crusher.x + 6, crusher.y + 6, crusher.w - 12, crusher.h - 12);
+  ctx.strokeRect(mover.x + 6, mover.y + 6, mover.w - 12, mover.h - 12);
   ctx.fillStyle = "rgba(246,239,226,0.18)";
-  ctx.fillRect(crusher.x + 14, crusher.y + 24, crusher.w - 28, 8);
-  ctx.fillRect(crusher.x + 14, crusher.y + crusher.h - 32, crusher.w - 28, 8);
+  ctx.fillRect(mover.x + 14, mover.y + 18, mover.w - 28, 8);
+  ctx.fillRect(mover.x + 14, mover.y + mover.h - 26, mover.w - 28, 8);
   ctx.restore();
 }
 
@@ -776,14 +1040,19 @@ function drawCore(core) {
 }
 
 function drawPlate(plate) {
-  const soloNeutral = role === "single" && plate.color === "red";
-  ctx.shadowColor = plate.active ? "#75f0a2" : soloNeutral ? "#f2c14e" : plate.color === "blue" ? "#59d8ff" : "#ff5d6e";
-  ctx.shadowBlur = plate.active ? 18 : 8;
-  ctx.fillStyle = plate.active ? "#75f0a2" : soloNeutral ? "#6c5a26" : plate.color === "blue" ? "#246e9e" : "#923548";
+  const plateColor = role === "single" ? "blue" : plate.color;
+  const baseColor = plateColor === "blue" ? "#59d8ff" : "#ff5d6e";
+  ctx.shadowColor = plate.active ? "#243447" : baseColor;
+  ctx.shadowBlur = plate.active ? 2 : 26;
+  ctx.fillStyle = plate.active ? "rgba(75,90,105,0.75)" : plateColor === "blue" ? "#40c8ff" : "#ff4f68";
   ctx.fillRect(plate.x, plate.y, plate.w, plate.h);
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = soloNeutral ? "#f2c14e" : plate.color === "blue" ? "#59d8ff" : "#ff5d6e";
+  ctx.strokeStyle = plate.active ? "rgba(246,239,226,0.28)" : "#f6efe2";
   ctx.strokeRect(plate.x - 6, plate.y - 6, plate.w + 12, plate.h + 12);
+  if (!plate.active) {
+    ctx.fillStyle = "rgba(246,239,226,0.38)";
+    ctx.fillRect(plate.x + 12, plate.y + 5, plate.w - 24, 4);
+  }
 }
 
 function drawWall(wall) {
@@ -794,9 +1063,10 @@ function drawWall(wall) {
     ctx.strokeRect(wall.x + 8, wall.y + 10, wall.w - 16, wall.h - 20);
     return;
   }
-  ctx.shadowColor = wall.gate === "blue" ? "#59d8ff" : wall.gate === "red" ? "#ff5d6e" : "#f2c14e";
+  const wallColor = role === "single" ? "blue" : wall.gate;
+  ctx.shadowColor = wallColor === "blue" ? "#59d8ff" : wallColor === "red" ? "#ff5d6e" : "#f2c14e";
   ctx.shadowBlur = 16;
-  ctx.fillStyle = wall.gate === "blue" ? "rgba(89,216,255,0.68)" : wall.gate === "red" ? "rgba(255,93,110,0.68)" : "rgba(242,193,78,0.74)";
+  ctx.fillStyle = wallColor === "blue" ? "rgba(89,216,255,0.68)" : wallColor === "red" ? "rgba(255,93,110,0.68)" : "rgba(242,193,78,0.74)";
   ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
   ctx.shadowBlur = 0;
   ctx.strokeStyle = "#f6efe2";
@@ -887,10 +1157,10 @@ function drawCompletionBanner() {
   ctx.textAlign = "center";
   ctx.fillText("CONGRATULATIONS", W / 2, H / 2 - 22);
   ctx.font = "800 24px Inter, sans-serif";
-  ctx.fillText("Level 1 Completed", W / 2, H / 2 + 24);
+  ctx.fillText(`${level.name} Completed`, W / 2, H / 2 + 24);
   ctx.font = "700 16px Inter, sans-serif";
   ctx.fillStyle = "#aeb7c8";
-  ctx.fillText("Press R to replay the level", W / 2, H / 2 + 58);
+  ctx.fillText(currentLevelIndex < LEVELS.length - 1 ? "Press N for next level or R to replay" : "All levels complete. Press R to replay.", W / 2, H / 2 + 58);
   ctx.textAlign = "left";
 }
 
@@ -898,6 +1168,7 @@ document.querySelector("#show-single").addEventListener("click", () => showPanel
 document.querySelector("#show-multi").addEventListener("click", () => showPanel("multi-panel"));
 document.querySelector("#start-single").addEventListener("click", startSingle);
 fullscreenToggle.addEventListener("click", toggleFullscreen);
+levelSelect.addEventListener("change", () => goToLevel(Number(levelSelect.value)));
 document.querySelector("#local-coop").addEventListener("click", startLocalCoop);
 document.querySelector("#online-menu").addEventListener("click", showOnlineActions);
 document.querySelector("#host-game").addEventListener("click", hostGame);
@@ -928,6 +1199,10 @@ window.addEventListener("keydown", (event) => {
   keys.add(event.key.toLowerCase());
   if (event.key.toLowerCase() === "r" && game.completed) {
     startLevel(modeStatus.textContent || "Single");
+    return;
+  }
+  if (event.key.toLowerCase() === "n" && game.completed) {
+    nextLevel();
     return;
   }
   if (assignment && assignment.pending && (event.key === "ArrowLeft" || event.key.toLowerCase() === "a")) chooseAssignment("blue");

@@ -44,6 +44,35 @@ body {
   min-height: 58px;
 }
 
+.level-select-label {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  align-content: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(246, 239, 226, 0.13);
+  border-radius: 8px;
+  background: rgba(17, 23, 34, 0.86);
+}
+
+.level-select-label span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+select {
+  min-width: 72px;
+  min-height: 30px;
+  border: 1px solid rgba(246, 239, 226, 0.22);
+  border-radius: 6px;
+  background: #07090e;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 900;
+}
+
 .eyebrow {
   margin: 0 0 5px;
   color: var(--blue);
