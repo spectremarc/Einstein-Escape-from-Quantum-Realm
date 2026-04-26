@@ -26,6 +26,7 @@ let role = "single";
 let rafId = 0;
 let assignment = null;
 let lastSnapshot = null;
+let lastNetworkSend = 0;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -66,7 +67,7 @@ const level = {
     { x: 2410, y: 518, r: 32, phase: 3.1 },
   ],
   crushers: [
-    { x: 905, baseY: 300, y: 300, w: 86, h: 170, phase: 0, range: 145 },
+    { x: 940, baseY: 500, y: 500, w: 62, h: 60, phase: 0, range: 0 },
   ],
   door: { x: 3000, y: 505, w: 72, h: 145, open: false },
 };
@@ -311,46 +312,76 @@ function update(now) {
   updatePlayer(game.players.blue, blueInput);
   if (role === "local") updatePlayer(game.players.red, redInput);
   updateWorld();
-  if (role === "host") send({ type: "state", snapshot: makeSnapshot() });
+  if (role === "host" && now - lastNetworkSend > 1 / 20) {
+    send({ type: "state", snapshot: makeSnapshot() });
+    lastNetworkSend = now;
+  }
   previousFrame(pads);
 }
 
 function makeSnapshot() {
   return {
-    running: game.running,
-    completed: game.completed,
-    time: game.time,
+    r: game.running,
+    c: game.completed,
+    t: game.time,
     camera: game.camera,
     zoom: game.zoom,
-    objective: game.objective,
-    endProgress: game.endProgress,
-    players: game.players,
-    walls: level.walls.map((wall) => wall.open),
-    plates: level.plates.map((plate) => plate.active),
-    cores: level.cores.map((core) => core.taken),
-    doorOpen: level.door.open,
-    crushers: level.crushers.map((crusher) => crusher.y),
-    molecules: level.molecules.map((molecule) => molecule.phase),
+    o: game.objective,
+    e: game.endProgress,
+    p: {
+      blue: packPlayer(game.players.blue),
+      red: packPlayer(game.players.red),
+    },
+    w: level.walls.map((wall) => wall.open ? 1 : 0),
+    pl: level.plates.map((plate) => plate.active ? 1 : 0),
+    co: level.cores.map((core) => core.taken ? 1 : 0),
+    d: level.door.open ? 1 : 0,
+    cr: level.crushers.map((crusher) => Math.round(crusher.y)),
+    m: level.molecules.map((molecule) => Number(molecule.phase.toFixed(2))),
+  };
+}
+
+function packPlayer(player) {
+  return [Math.round(player.x), Math.round(player.y), Number(player.vx.toFixed(1)), Number(player.vy.toFixed(1)), player.facing, player.grounded ? 1 : 0, player.jumps, player.activateFlash, player.hurt];
+}
+
+function unpackPlayer(color, data) {
+  return {
+    color,
+    x: data[0],
+    y: data[1],
+    w: 38,
+    h: 54,
+    vx: data[2],
+    vy: data[3],
+    facing: data[4],
+    grounded: Boolean(data[5]),
+    jumps: data[6],
+    activateFlash: data[7],
+    hurt: data[8],
   };
 }
 
 function applySnapshot(snapshot) {
   if (!snapshot) return;
   lastSnapshot = snapshot;
-  game.running = snapshot.running;
-  game.completed = snapshot.completed;
-  game.time = snapshot.time;
+  game.running = snapshot.r;
+  game.completed = snapshot.c;
+  game.time = snapshot.t;
   game.camera = snapshot.camera;
   game.zoom = snapshot.zoom;
-  game.objective = snapshot.objective;
-  game.endProgress = snapshot.endProgress;
-  game.players = snapshot.players;
-  snapshot.walls.forEach((open, index) => { level.walls[index].open = open; });
-  snapshot.plates.forEach((active, index) => { level.plates[index].active = active; });
-  snapshot.cores.forEach((taken, index) => { level.cores[index].taken = taken; });
-  level.door.open = snapshot.doorOpen;
-  snapshot.crushers.forEach((y, index) => { level.crushers[index].y = y; });
-  snapshot.molecules.forEach((phase, index) => { level.molecules[index].phase = phase; });
+  game.objective = snapshot.o;
+  game.endProgress = snapshot.e;
+  game.players = {
+    blue: unpackPlayer("blue", snapshot.p.blue),
+    red: unpackPlayer("red", snapshot.p.red),
+  };
+  snapshot.w.forEach((open, index) => { level.walls[index].open = Boolean(open); });
+  snapshot.pl.forEach((active, index) => { level.plates[index].active = Boolean(active); });
+  snapshot.co.forEach((taken, index) => { level.cores[index].taken = Boolean(taken); });
+  level.door.open = Boolean(snapshot.d);
+  snapshot.cr.forEach((y, index) => { level.crushers[index].y = y; });
+  snapshot.m.forEach((phase, index) => { level.molecules[index].phase = phase; });
   objectiveStatus.textContent = game.objective;
 }
 
@@ -364,7 +395,9 @@ function updateWorld() {
 
   for (const molecule of level.molecules) molecule.phase += 0.035;
   for (const crusher of level.crushers) {
-    crusher.y = crusher.baseY + (Math.sin(game.time * 1.8 + crusher.phase) + 1) * 0.5 * crusher.range;
+    crusher.y = crusher.range
+      ? crusher.baseY + (Math.sin(game.time * 1.8 + crusher.phase) + 1) * 0.5 * crusher.range
+      : crusher.baseY;
   }
   for (const player of activePlayers()) {
     player.activateFlash = Math.max(0, player.activateFlash - 1);
