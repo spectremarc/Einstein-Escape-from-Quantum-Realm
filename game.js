@@ -25,10 +25,8 @@ let conn = null;
 let role = "single";
 let rafId = 0;
 let assignment = null;
-let lastSnapshot = null;
-let lastNetworkSend = 0;
-let lastInputSend = 0;
-let lastInputPacket = "";
+let lastPlayerSend = 0;
+let lastPlayerPacket = "";
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -225,7 +223,7 @@ function hostGame() {
     conn = connection;
     bindConnection();
     networkMessage.textContent = "Red Einstein connected.";
-    send({ type: "state", game });
+    send({ type: "player", color: "blue", player: packPlayer(game.players.blue) });
   });
   peer.on("error", (error) => {
     networkMessage.textContent = error.type === "unavailable-id" ? "Room code busy. Try Host again." : `Network error: ${error.type}`;
@@ -253,14 +251,13 @@ function joinGame(code) {
 function bindConnection() {
   conn.on("open", () => {
     if (role === "join") startLevel("Joined");
+    if (role === "host") send({ type: "player", color: "blue", player: packPlayer(game.players.blue) });
+    if (role === "join") send({ type: "player", color: "red", player: packPlayer(game.players.red) });
     send({ type: "hello" });
   });
   conn.on("data", (message) => {
-    if (message.type === "input" && role === "host") {
-      applyRemoteInput(message.input);
-    }
-    if (message.type === "state" && role === "join") {
-      applySnapshot(message.snapshot);
+    if (message.type === "player") {
+      applyRemotePlayer(message.color, message.player);
     }
     if (message.type === "restart") {
       game = createGame();
@@ -290,7 +287,8 @@ function update(now) {
   const blueInput = readAssignedInput("blue", pads);
   const redInput = readAssignedInput("red", pads);
   const localOnlineInput = readInput(0, true, pads);
-  if (blueInput.restart || redInput.restart) {
+  const restartPressed = role === "join" ? localOnlineInput.restart : blueInput.restart || redInput.restart;
+  if (restartPressed) {
     game = createGame();
     game.running = true;
     send({ type: "restart" });
@@ -303,8 +301,9 @@ function update(now) {
   }
 
   if (role === "join") {
-    sendInputIfNeeded(localOnlineInput, now);
-    draw();
+    updatePlayer(game.players.red, localOnlineInput);
+    updateWorld();
+    sendPlayerIfNeeded("red", now);
     previousFrame(pads);
     return;
   }
@@ -312,65 +311,23 @@ function update(now) {
   updatePlayer(game.players.blue, blueInput);
   if (role === "local") updatePlayer(game.players.red, redInput);
   updateWorld();
-  if (role === "host" && now - lastNetworkSend > 1 / 15) {
-    send({ type: "state", snapshot: makeSnapshot() });
-    lastNetworkSend = now;
-  }
+  if (role === "host") sendPlayerIfNeeded("blue", now);
   previousFrame(pads);
 }
 
-function sendInputIfNeeded(input, now) {
-  const packet = `${Math.round(input.move * 100)},${input.jump ? 1 : 0},${input.activate ? 1 : 0},${input.restart ? 1 : 0}`;
-  const changed = packet !== lastInputPacket;
-  if (!changed && now - lastInputSend < 1 / 12) return;
-  if (changed || now - lastInputSend > 1 / 30) {
-    send({ type: "input", input });
-    lastInputPacket = packet;
-    lastInputSend = now;
+function sendPlayerIfNeeded(color, now) {
+  const packet = packPlayer(game.players[color]).join(",");
+  const changed = packet !== lastPlayerPacket;
+  if (!changed && now - lastPlayerSend < 1 / 10) return;
+  if (changed || now - lastPlayerSend > 1 / 20) {
+    send({ type: "player", color, player: packPlayer(game.players[color]) });
+    lastPlayerPacket = packet;
+    lastPlayerSend = now;
   }
-}
-
-function makeSnapshot() {
-  return {
-    r: game.running,
-    c: game.completed,
-    t: game.time,
-    camera: game.camera,
-    zoom: game.zoom,
-    o: game.objective,
-    e: game.endProgress,
-    p: {
-      blue: packPlayer(game.players.blue),
-      red: packPlayer(game.players.red),
-    },
-    w: level.walls.map((wall) => wall.open ? 1 : 0),
-    pl: level.plates.map((plate) => plate.active ? 1 : 0),
-    co: level.cores.map((core) => core.taken ? 1 : 0),
-    d: level.door.open ? 1 : 0,
-    cr: level.crushers.map((crusher) => Math.round(crusher.y)),
-    m: level.molecules.map((molecule) => Number(molecule.phase.toFixed(2))),
-  };
 }
 
 function packPlayer(player) {
   return [Math.round(player.x), Math.round(player.y), Number(player.vx.toFixed(1)), Number(player.vy.toFixed(1)), player.facing, player.grounded ? 1 : 0, player.jumps, player.activateFlash, player.hurt];
-}
-
-function unpackPlayer(color, data) {
-  return {
-    color,
-    x: data[0],
-    y: data[1],
-    w: 38,
-    h: 54,
-    vx: data[2],
-    vy: data[3],
-    facing: data[4],
-    grounded: Boolean(data[5]),
-    jumps: data[6],
-    activateFlash: data[7],
-    hurt: data[8],
-  };
 }
 
 function applyPackedPlayer(player, data) {
@@ -385,35 +342,13 @@ function applyPackedPlayer(player, data) {
   player.hurt = data[8];
 }
 
-function applySnapshot(snapshot) {
-  if (!snapshot) return;
-  lastSnapshot = snapshot;
-  game.running = snapshot.r;
-  game.completed = snapshot.c;
-  game.time = snapshot.t;
-  game.camera = snapshot.camera;
-  game.zoom = snapshot.zoom;
-  game.objective = snapshot.o;
-  game.endProgress = snapshot.e;
-  applyPackedPlayer(game.players.blue, snapshot.p.blue);
-  applyPackedPlayer(game.players.red, snapshot.p.red);
-  snapshot.w.forEach((open, index) => { level.walls[index].open = Boolean(open); });
-  snapshot.pl.forEach((active, index) => { level.plates[index].active = Boolean(active); });
-  snapshot.co.forEach((taken, index) => { level.cores[index].taken = Boolean(taken); });
-  level.door.open = Boolean(snapshot.d);
-  snapshot.cr.forEach((y, index) => { level.crushers[index].y = y; });
-  snapshot.m.forEach((phase, index) => { level.molecules[index].phase = phase; });
-  objectiveStatus.textContent = game.objective;
-}
-
-function applyRemoteInput(input) {
-  if (role !== "host") return;
-  game.remoteInput = input;
+function applyRemotePlayer(color, playerData) {
+  const target = game.players[color];
+  if (!target) return;
+  applyPackedPlayer(target, playerData);
 }
 
 function updateWorld() {
-  if (role === "host" && game.remoteInput) updatePlayer(game.players.red, game.remoteInput);
-
   for (const molecule of level.molecules) molecule.phase += 0.035;
   for (const crusher of level.crushers) {
     crusher.y = crusher.range
