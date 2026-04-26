@@ -27,6 +27,7 @@ let rafId = 0;
 let assignment = null;
 let lastPlayerSend = 0;
 let lastPlayerPacket = "";
+let lastSendDuration = 0;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -318,9 +319,14 @@ function update(now) {
 function sendPlayerIfNeeded(color, now) {
   const packet = packPlayer(game.players[color]).join(",");
   const changed = packet !== lastPlayerPacket;
-  if (!changed && now - lastPlayerSend < 1 / 10) return;
-  if (changed || now - lastPlayerSend > 1 / 20) {
+  const minInterval = lastSendDuration > 45 ? 1 / 20 : 1 / 45;
+  const keepAlive = lastSendDuration > 45 ? 1 / 12 : 1 / 24;
+  if (!changed && now - lastPlayerSend < keepAlive) return;
+  if (changed && now - lastPlayerSend < minInterval) return;
+  if (changed || now - lastPlayerSend > keepAlive) {
+    const started = performance.now();
     send({ type: "player", color, player: packPlayer(game.players[color]) });
+    lastSendDuration = performance.now() - started;
     lastPlayerPacket = packet;
     lastPlayerSend = now;
   }
@@ -383,9 +389,12 @@ function activePlayers() {
 }
 
 function updateCamera() {
-  if (role === "single") {
+  const localPlayer = role === "join" ? game.players.red : game.players.blue;
+  const viewInput = role === "join" ? readInput(0, true, getGamepads()) : readAssignedInput("blue", getGamepads());
+
+  if (role === "single" || !viewInput.teamView) {
     game.zoom += (1 - game.zoom) * 0.08;
-    game.camera = clamp(game.players.blue.x - W * 0.45, 0, level.width - W / game.zoom);
+    game.camera = clamp(localPlayer.x - W * 0.45, 0, level.width - W / game.zoom);
     return;
   }
 
@@ -543,11 +552,12 @@ function readInput(padIndex = 0, includeKeyboard = true, pads = getGamepads()) {
     jump: pad.jump || keyboard.jump,
     activate: pad.activate || keyboard.activate,
     restart: pad.restart || keyboard.restart,
+    teamView: pad.teamView || keyboard.teamView,
   };
 }
 
 function blankInput() {
-  return { move: 0, jump: false, activate: false, restart: false };
+  return { move: 0, jump: false, activate: false, restart: false, teamView: false };
 }
 
 function readKeyboardInput() {
@@ -556,6 +566,7 @@ function readKeyboardInput() {
     jump: pressed("w") || pressed(" ") || pressed("arrowup"),
     activate: keys.has("e"),
     restart: pressed("r"),
+    teamView: keys.has("q"),
   };
 }
 
@@ -571,6 +582,7 @@ function readPadInput(padIndex, pads = getGamepads()) {
     jump: buttons[0] && !previousButtons[0],
     activate: buttons[1],
     restart: buttons[9] && !previousButtons[9],
+    teamView: buttons[3],
   };
 }
 
